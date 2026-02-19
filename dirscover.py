@@ -8,18 +8,20 @@ from pyfiglet import Figlet
 
 def httpresp_scan_200check(i, url, response):
     #Compares http response length of url+i vs url+random_string
-    if (len(response.text) - len(i)) == (len(requests.get(url+"hshshedhhfcuueeiisisiaow").text) - len("hshshedhhfcuueeiisisiaow")):
+    random_string = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+    if (len(response.text) - len(i)) == (len(requests.get(url+random_string).text) - len(random_string)):
         print(f"A possible false positive at {url}{i}")
-    elif (len(response.text) - len(i)) != (len(requests.get(url+"hshshedhhfcuueeiisisiaow").text) - len("hshshedhhfcuueeiisisiaow")):
+    elif (len(response.text) - len(i)) != (len(requests.get(url+random_string).text) - len(random_string)):
         print(f"[HTTP {response.status_code}] - Possible directory found: {url}{i}")
 
 def httpresp_scan_300check(i, url, response):
     #get requests for checking
     url_to_scan = url + i.strip()
     r = requests.get(url_to_scan)
-    if r.text != requests.get(url+"gsgshsheheh").text:
+    random_string = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+    if r.text != requests.get(url+random_string).text:
         print(f"Redirect found with {url}{i} >> {r.url}")
-    elif r.text == requests.get(url+"gsgshsheheh").text:
+    elif r.text == requests.get(url+random_string).text:
         return
 
 
