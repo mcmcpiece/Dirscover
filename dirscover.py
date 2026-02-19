@@ -6,13 +6,24 @@ import random
 from bs4 import BeautifulSoup
 from pyfiglet import Figlet
 
+results = []
+
+def save(output_file):
+    file = open(output_file, "w")
+    file.writelines(f.renderText("Dirscover.py\n"))
+    file.writelines("Scans and looks for possible web directories. Useful for reconnaisance.\n")
+    for i in results:
+        file.writelines(i + "\n")
+
 def httpresp_scan_200check(i, url, response):
     #Compares http response length of url+i vs url+random_string
     random_string = ''.join(random.choice(string.ascii_letters) for _ in range(10))
     if (len(response.text) - len(i)) == (len(requests.get(url+random_string).text) - len(random_string)):
-        print(f"A possible false positive at {url}{i}")
+        print(f"[HTTP {response.status_code}] - A possible false positive at {url}{i}")
+        results.append((url+i.strip()) + " --- " + str(response.status_code))
     elif (len(response.text) - len(i)) != (len(requests.get(url+random_string).text) - len(random_string)):
         print(f"[HTTP {response.status_code}] - Possible directory found: {url}{i}")
+        results.append((url+i.strip()) + " --- " + str(response.status_code))
 
 def httpresp_scan_300check(i, url, response):
     #get requests for checking
@@ -20,7 +31,8 @@ def httpresp_scan_300check(i, url, response):
     r = requests.get(url_to_scan)
     random_string = ''.join(random.choice(string.ascii_letters) for _ in range(10))
     if r.text != requests.get(url+random_string).text:
-        print(f"Redirect found with {url}{i} >> {r.url}")
+        print(f"[HTTP {response.status_code}] - Redirect found with {url}{i} >> {r.url}")
+        results.append((url+i.strip()) + " --- " + str(response.status_code))
     elif r.text == requests.get(url+random_string).text:
         return
 
@@ -28,7 +40,6 @@ def httpresp_scan_300check(i, url, response):
 def httpresp_scan(wlist, url, args):
     #Performs attack by interpretting http response codes
     print(f"Discovering directories for {url}...")
-    responses = []
     for i in wlist:
         print(f"Seeing if {i.strip()} exists...")
         response = requests.get(url + i.strip(), allow_redirects=False)
@@ -42,9 +53,14 @@ def httpresp_scan(wlist, url, args):
             else:
                 httpresp_scan_300check(i, url, response)
         elif 400 <= response.status_code <= 499:
-            continue
+            if response.status_code == 404:
+                continue
+            else:
+                print(f"[HTTP {response.status_code}] - You may want to take a look at {url}{i}")
+                results.append((url+i.strip()) + " --- " + str(response.status_code))
         elif 500 <= response.status_code <= 599:
-            print(f"Restricted access at {url}{i}")
+            print(f"[HTTP {response.status_code}]Restricted access at {url}{i}")
+            results.append((url+i.strip()) + " --- " + str(response.status_code))
 
 def httplength_scan(wlist, url):
     print(f"Running httplength scan with {url}")
@@ -57,7 +73,7 @@ def httplength_scan(wlist, url):
     
     #Making the actual attempts
     for i in wlist:
-        print(f"Seeing if {url}{i}")
+        print(f"Seeing if {url}{i.strip()} exists...")
         response = requests.get(url+i.strip())
         response_html = response.text
         response_soup = BeautifulSoup(response_html, "html.parser")
@@ -66,6 +82,7 @@ def httplength_scan(wlist, url):
             continue
         else:
             print(f"Possible directory found at {url}{i.strip()}")
+            results.append((url+i.strip()) + " --- " + str(response.status_code))
     
 
 def main():
@@ -75,6 +92,7 @@ def main():
     parse.add_argument("url", help="Root directory of the website. If you encounter an error, try adding the specific port number to this argument, Otherwise, it defaults to port 80 for http and port 443 for https.")
     parse.add_argument("--mode", help="Defines which mode to run: httpresp (scans which directory returns a 200 OK response from the server) | httplength (scans the length of the http response per directory and returns the one with the significant difference)", default="httpresp")
     parse.add_argument("--accept300", help="Accepts all HTTP 3XX responses and printing the final URL for the redirects. Disabled by default to focus only on HTTP 2XX responses", action="store_false")
+    parse.add_argument("--output", help="Stores the result in .txt format")
     args=parse.parse_args()
     
     #opening wlist as a file and interpretting functions
@@ -87,6 +105,11 @@ def main():
         httplength_scan(wfile, args.url)
     else:
         print(f"Mode can't be {args.mode}")
+    
+    if args.output == "":
+        return
+    else:
+        save(args.output)
 
 if __name__=="__main__":
     try:
@@ -96,4 +119,5 @@ if __name__=="__main__":
         main()
     except KeyboardInterrupt:
         print("\nDid you mean to exit? Exiting now...")
+        print("\n".join(results))
         exit()
